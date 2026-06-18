@@ -6,10 +6,10 @@ include 'koneksi.php';
 $aksi = isset($_GET['aksi']) ? $_GET['aksi'] : '';
 
 // ==========================================
-// PROSES LOGIKA (SIMPAN, UPDATE, HAPUS)
+// PROSES LOGIKA (SIMPAN, UPDATE, HAPUS BARANG & KATEGORI)
 // ==========================================
 
-// Jika tombol "Simpan Data" (Form Tambah) diklik
+// Jika tombol "Simpan Data" (Form Tambah Barang) diklik
 if (isset($_POST['simpan_tambah'])) {
     $nama = mysqli_real_escape_string($koneksi, $_POST['nama_barang']);
     $merek = mysqli_real_escape_string($koneksi, $_POST['merek']);
@@ -24,30 +24,38 @@ if (isset($_POST['simpan_tambah'])) {
     exit;
 }
 
-// Jika tombol "Simpan Perubahan" (Form Edit) diklik
+// [BARU] Jika tombol "Simpan Kategori" (Form Tambah Kategori) diklik
+if (isset($_POST['simpan_kategori'])) {
+    $nama_kategori = mysqli_real_escape_string($koneksi, $_POST['nama_kategori']);
+    
+    // Simpan ke database kategori
+    $query_kategori = "INSERT INTO kategori (nama_kategori) VALUES ('$nama_kategori')";
+    mysqli_query($koneksi, $query_kategori);
+    
+    // Setelah selesai buat kategori, arahkan kembali ke form tambah barang 
+    // agar bisa langsung dipakai
+    header("Location: barang.php?aksi=tambah");
+    exit;
+}
+
+// Jika tombol "Simpan Perubahan" (Form Edit Barang) diklik
 if (isset($_POST['simpan_edit'])) {
     $id = $_POST['id_barang'];
     $nama = mysqli_real_escape_string($koneksi, $_POST['nama_barang']);
     $merek = mysqli_real_escape_string($koneksi, $_POST['merek']);
     $spesifikasi = mysqli_real_escape_string($koneksi, $_POST['spesifikasi']);
     $id_kategori = $_POST['id_kategori'];
-    
-    // Update data (Perhatikan: Stok tidak ikut di-update di sini)
-    $query = "UPDATE barang SET 
-                nama_barang = '$nama', 
-                merek = '$merek', 
-                spesifikasi = '$spesifikasi', 
-                id_kategori = '$id_kategori' 
-              WHERE id_barang = '$id'";
+
+    $query = "UPDATE barang SET nama_barang='$nama', merek='$merek', spesifikasi='$spesifikasi', id_kategori='$id_kategori' WHERE id_barang='$id'";
     mysqli_query($koneksi, $query);
     header("Location: barang.php");
     exit;
 }
 
-// Proses Hapus Data
+// Proses hapus barang
 if ($aksi == 'hapus') {
     $id = $_GET['id'];
-    mysqli_query($koneksi, "DELETE FROM barang WHERE id_barang = '$id'");
+    mysqli_query($koneksi, "DELETE FROM barang WHERE id_barang='$id'");
     header("Location: barang.php");
     exit;
 }
@@ -58,162 +66,210 @@ if ($aksi == 'hapus') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Master Data Barang - ElectroStock</title>
+    <title>Kelola Barang - ElectroStock</title>
     <style>
         /* CSS Dasar */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
         
-        /* Tombol & Tabel */
+        /* Tombol */
         .btn { padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold; border: none; cursor: pointer; color: white; }
         .btn-primary { background-color: #0984e3; }
         .btn-secondary { background-color: #636e72; }
         .btn-success { background-color: #00b894; }
         .btn-warning { background-color: #fdcb6e; color: #2d3436; }
         .btn-danger { background-color: #d63031; }
-        .btn-action { padding: 5px 10px; font-size: 12px; margin-right: 2px; }
+        .btn-action { padding: 5px 10px; font-size: 12px; margin-right: 3px;}
         
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
-        th { background-color: #f8f9fa; }
-        
-        /* Form */
+        /* Form & Tabel */
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
         .form-control { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         
-        /* Detail Card */
-        .detail-card { background: #f8f9fa; padding: 20px; border-radius: 5px; border-left: 5px solid #0984e3; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        table, th, td { border: 1px solid #ddd; }
+        th, td { padding: 12px; text-align: left; }
+        th { background-color: #f8f9fa; }
+        
+        /* Table Detail */
+        .table-detail { width: 100%; border: none; }
+        .table-detail td { border: none; padding: 8px 0; border-bottom: 1px dashed #eee; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="header">
-        <h2>📦 Manajemen Data Barang</h2>
-        <a href="index.php" class="btn btn-secondary">⬅ Kembali ke Dashboard</a>
-    </div>
 
-    <?php
+    <?php 
     // ==========================================
-    // TAMPILAN BERDASARKAN AKSI
+    // ANTARMUKA HALAMAN TAMBAH BARANG
     // ==========================================
-    
-    // 1. TAMPILAN FORM TAMBAH
-    if ($aksi == 'tambah') {
+    if ($aksi == 'tambah') { 
     ?>
-        <h3>Tambah Barang Baru</h3>
-        <form method="POST" action="barang.php">
+        <div class="header">
+            <h2>Tambah Data Barang</h2>
+            <a href="barang.php" class="btn btn-secondary">⬅️ Kembali</a>
+        </div>
+        <form action="barang.php" method="POST">
             <div class="form-group">
                 <label>Nama Barang</label>
-                <input type="text" name="nama_barang" class="form-control" required>
+                <input type="text" name="nama_barang" class="form-control" required placeholder="Contoh: Laptop Thinkpad T480">
             </div>
             <div class="form-group">
                 <label>Merek</label>
-                <input type="text" name="merek" class="form-control" required>
+                <input type="text" name="merek" class="form-control" required placeholder="Contoh: Lenovo">
             </div>
             <div class="form-group">
                 <label>Kategori</label>
                 <select name="id_kategori" class="form-control" required>
                     <option value="">-- Pilih Kategori --</option>
                     <?php
-                    // Ambil data kategori untuk dropdown
-                    $q_kat = mysqli_query($koneksi, "SELECT * FROM kategori");
-                    while($k = mysqli_fetch_assoc($q_kat)) {
+                    $q_kategori = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY nama_kategori ASC");
+                    while($k = mysqli_fetch_assoc($q_kategori)) {
                         echo "<option value='".$k['id_kategori']."'>".$k['nama_kategori']."</option>";
                     }
                     ?>
                 </select>
+                <small style="display:block; margin-top:6px; color:#555;">
+                    Kategori tidak ada di daftar? <a href="barang.php?aksi=tambah_kategori" style="color:#0984e3; font-weight:bold;">➕ Tambah Kategori Baru</a>
+                </small>
             </div>
             <div class="form-group">
-                <label>Spesifikasi (Opsional)</label>
-                <textarea name="spesifikasi" class="form-control" rows="3"></textarea>
+                <label>Spesifikasi</label>
+                <textarea name="spesifikasi" class="form-control" rows="4" placeholder="Tuliskan spesifikasi produk (RAM, Prosesor, Warna, dll)"></textarea>
             </div>
-            <!-- Stok tidak dimasukkan di sini, otomatis diset 0 di proses PHP -->
-            
-            <button type="submit" name="simpan_tambah" class="btn btn-success">💾 Simpan Data</button>
-            <a href="barang.php" class="btn btn-secondary">Batal</a>
+            <button type="submit" name="simpan_tambah" class="btn btn-primary">💾 Simpan Data Barang</button>
         </form>
 
-    <?php
-    // 2. TAMPILAN FORM EDIT
-    } elseif ($aksi == 'edit') {
-        $id = $_GET['id'];
-        // Ambil data barang yang akan diedit
-        $q_edit = mysqli_query($koneksi, "SELECT * FROM barang WHERE id_barang = '$id'");
-        $data = mysqli_fetch_assoc($q_edit);
+    <?php 
+    // ==========================================
+    // ANTARMUKA HALAMAN TAMBAH KATEGORI BARU
+    // ==========================================
+    } else if ($aksi == 'tambah_kategori') { 
     ?>
-        <h3>Edit Data Barang</h3>
-        <form method="POST" action="barang.php">
-            <!-- ID Barang disembunyikan untuk keperluan update -->
-            <input type="hidden" name="id_barang" value="<?php echo $data['id_barang']; ?>">
+        <div class="header">
+            <h2>Tambah Kategori Baru</h2>
+            <a href="javascript:history.back()" class="btn btn-secondary">⬅️ Kembali</a>
+        </div>
+        <form action="barang.php" method="POST">
+            <div class="form-group">
+                <label>Nama Kategori</label>
+                <input type="text" name="nama_kategori" class="form-control" required placeholder="Contoh: Aksesoris Komputer, Handphone, dll">
+            </div>
+            <button type="submit" name="simpan_kategori" class="btn btn-success">💾 Simpan Kategori</button>
+        </form>
+
+    <?php 
+    // ==========================================
+    // ANTARMUKA HALAMAN EDIT BARANG
+    // ==========================================
+    } else if ($aksi == 'edit') { 
+        $id = $_GET['id'];
+        $query_edit = mysqli_query($koneksi, "SELECT * FROM barang WHERE id_barang='$id'");
+        $data_edit = mysqli_fetch_assoc($query_edit);
+    ?>
+        <div class="header">
+            <h2>Edit Data Barang</h2>
+            <a href="barang.php" class="btn btn-secondary">⬅️ Kembali</a>
+        </div>
+        <form action="barang.php" method="POST">
+            <input type="hidden" name="id_barang" value="<?php echo $data_edit['id_barang']; ?>">
             
             <div class="form-group">
                 <label>Nama Barang</label>
-                <input type="text" name="nama_barang" class="form-control" value="<?php echo $data['nama_barang']; ?>" required>
+                <input type="text" name="nama_barang" class="form-control" value="<?php echo $data_edit['nama_barang']; ?>" required>
             </div>
             <div class="form-group">
                 <label>Merek</label>
-                <input type="text" name="merek" class="form-control" value="<?php echo $data['merek']; ?>" required>
+                <input type="text" name="merek" class="form-control" value="<?php echo $data_edit['merek']; ?>" required>
             </div>
             <div class="form-group">
                 <label>Kategori</label>
                 <select name="id_kategori" class="form-control" required>
                     <?php
-                    $q_kat = mysqli_query($koneksi, "SELECT * FROM kategori");
-                    while($k = mysqli_fetch_assoc($q_kat)) {
-                        // Cek kategori mana yang sedang dipilih
-                        $selected = ($k['id_kategori'] == $data['id_kategori']) ? "selected" : "";
+                    $q_kategori = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY nama_kategori ASC");
+                    while($k = mysqli_fetch_assoc($q_kategori)) {
+                        // Cek apakah id_kategori sama dengan kategori barang yang sedang diedit
+                        $selected = ($k['id_kategori'] == $data_edit['id_kategori']) ? "selected" : "";
                         echo "<option value='".$k['id_kategori']."' $selected>".$k['nama_kategori']."</option>";
                     }
                     ?>
                 </select>
+                <small style="display:block; margin-top:6px; color:#555;">
+                    Kategori tidak ada? <a href="barang.php?aksi=tambah_kategori" style="color:#0984e3; font-weight:bold;">➕ Tambah Kategori Baru</a>
+                </small>
             </div>
             <div class="form-group">
                 <label>Spesifikasi</label>
-                <textarea name="spesifikasi" class="form-control" rows="3"><?php echo $data['spesifikasi']; ?></textarea>
+                <textarea name="spesifikasi" class="form-control" rows="4"><?php echo $data_edit['spesifikasi']; ?></textarea>
             </div>
-            <!-- Sekali lagi, tidak ada input untuk edit stok -->
-            
-            <button type="submit" name="simpan_edit" class="btn btn-success">💾 Simpan Perubahan</button>
-            <a href="barang.php" class="btn btn-secondary">Batal</a>
+            <button type="submit" name="simpan_edit" class="btn btn-warning">💾 Simpan Perubahan</button>
         </form>
 
-    <?php
-    // 3. TAMPILAN DETAIL
-    } elseif ($aksi == 'detail') {
+    <?php 
+    // ==========================================
+    // ANTARMUKA DETAIL BARANG
+    // ==========================================
+    } else if ($aksi == 'detail') { 
         $id = $_GET['id'];
-        $q_detail = mysqli_query($koneksi, "
+        $query_detail = mysqli_query($koneksi, "
             SELECT barang.*, kategori.nama_kategori 
             FROM barang 
             JOIN kategori ON barang.id_kategori = kategori.id_kategori 
-            WHERE id_barang = '$id'
+            WHERE barang.id_barang='$id'
         ");
-        $data = mysqli_fetch_assoc($q_detail);
+        $data_detail = mysqli_fetch_assoc($query_detail);
     ?>
-        <h3>Detail Spesifikasi Barang</h3>
-        <div class="detail-card">
-            <p><strong>Nama Barang:</strong> <?php echo $data['nama_barang']; ?></p>
-            <p><strong>Merek:</strong> <?php echo $data['merek']; ?></p>
-            <p><strong>Kategori:</strong> <span style="background: #0984e3; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px;"><?php echo $data['nama_kategori']; ?></span></p>
-            <p><strong>Sisa Stok:</strong> 
-                <span style="font-size: 18px; font-weight: bold; color: <?php echo ($data['stok'] <= 5) ? '#d63031' : '#00b894'; ?>;">
-                    <?php echo $data['stok']; ?> Unit
-                </span>
-            </p>
-            <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
-            <p><strong>Spesifikasi Lengkap:</strong><br> <?php echo nl2br($data['spesifikasi']); ?></p>
+        <div class="header">
+            <h2>Detail Informasi Barang</h2>
+            <a href="barang.php" class="btn btn-secondary">⬅️ Kembali</a>
         </div>
-        <br>
-        <a href="barang.php" class="btn btn-primary">Kembali ke Tabel</a>
+        <table class="table-detail">
+            <tr>
+                <td width="25%"><strong>Nama Barang</strong></td>
+                <td width="5%">:</td>
+                <td><?php echo $data_detail['nama_barang']; ?></td>
+            </tr>
+            <tr>
+                <td><strong>Merek</strong></td>
+                <td>:</td>
+                <td><?php echo $data_detail['merek']; ?></td>
+            </tr>
+            <tr>
+                <td><strong>Kategori</strong></td>
+                <td>:</td>
+                <td><?php echo $data_detail['nama_kategori']; ?></td>
+            </tr>
+            <tr>
+                <td><strong>Stok Saat Ini</strong></td>
+                <td>:</td>
+                <td><strong style="color: #00b894; font-size: 18px;"><?php echo $data_detail['stok']; ?> Unit</strong></td>
+            </tr>
+            <tr>
+                <td style="vertical-align: top;"><strong>Spesifikasi</strong></td>
+                <td style="vertical-align: top;">:</td>
+                <td><?php echo nl2br($data_detail['spesifikasi']); ?></td>
+            </tr>
+        </table>
 
-    <?php
-    // 4. TAMPILAN TABEL (DEFAULT)
-    } else {
+    <?php 
+    // ==========================================
+    // ANTARMUKA UTAMA (DAFTAR BARANG)
+    // ==========================================
+    } else { 
     ?>
-        <a href="barang.php?aksi=tambah" class="btn btn-primary">+ Tambah Barang Baru</a>
-        
+        <div class="header">
+            <div>
+                <h2 style="margin: 0 0 5px 0;">Daftar Inventaris Barang</h2>
+                <a href="index.php" class="btn btn-secondary" style="font-size: 13px; padding: 5px 10px;">⬅️ Kembali ke Dashboard</a>
+            </div>
+            <div>
+                <a href="barang.php?aksi=tambah_kategori" class="btn btn-success">➕ Tambah Kategori</a>
+                <a href="barang.php?aksi=tambah" class="btn btn-primary" style="margin-left: 5px;">➕ Tambah Barang</a>
+            </div>
+        </div>
+
         <table>
             <thead>
                 <tr>
@@ -227,7 +283,6 @@ if ($aksi == 'hapus') {
             </thead>
             <tbody>
                 <?php
-                // Query mengambil data barang digabung dengan kategori
                 $query_tampil = "
                     SELECT barang.*, kategori.nama_kategori 
                     FROM barang 
