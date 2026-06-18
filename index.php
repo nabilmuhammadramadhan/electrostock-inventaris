@@ -160,17 +160,36 @@ while($row = mysqli_fetch_assoc($query_sedikit)) {
         const labelSedikit = <?php echo json_encode($label_sedikit); ?>;
         const dataSedikit = <?php echo json_encode($data_sedikit); ?>;
 
+        // Fungsi warna dinamis untuk mencegah warna kategori sama/berulang
+        function generateDynamicColors(count) {
+            const colors = ['#0984e3', '#00b894', '#fdcb6e', '#d63031', '#6c5ce7', '#e84393', '#00cec9', '#b2bec3'];
+            let generatedColors = [];
+            for (let i = 0; i < count; i++) {
+                // Gunakan warna dasar jika masih tersedia
+                if (i < colors.length) {
+                    generatedColors.push(colors[i]);
+                } else {
+                    // Buat warna acak (Hue dinamis) jika kategori lebih dari 8
+                    const hue = Math.floor(Math.random() * 360);
+                    generatedColors.push(`hsl(${hue}, 75%, 55%)`);
+                }
+            }
+            return generatedColors;
+        }
+
         new Chart(document.getElementById('kategoriChart'), {
             type: 'pie',
             data: {
                 labels: labelKategori,
                 datasets: [{
                     data: dataKategori,
-                    backgroundColor: ['#0984e3', '#00b894', '#fdcb6e']
+                    // Panggil fungsi di atas sesuai jumlah data kategori
+                    backgroundColor: generateDynamicColors(labelKategori.length)
                 }]
             },
             options: { responsive: true, maintainAspectRatio: false }
         });
+
 
         new Chart(document.getElementById('transaksiChart'), {
             type: 'doughnut',
