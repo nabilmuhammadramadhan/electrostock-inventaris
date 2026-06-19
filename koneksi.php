@@ -3,7 +3,7 @@
 $host = "localhost";
 $user = "root";
 $pass = ""; // Password default di Laragon biasanya dibiarkan kosong
-$db   = "inventaris_gudang"; // Nama database yang kamu buat tadi
+$db   = "db_inventaris"; // Nama database yang kamu buat tadi
 
 // Membuat koneksi
 $koneksi = mysqli_connect($host, $user, $pass, $db);

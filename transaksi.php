@@ -1,4 +1,11 @@
 <?php
+// Wajib ada untuk membaca data siapa yang sedang login
+session_start();
+if(!isset($_SESSION['login'])){
+    header("Location: login.php");
+    exit;
+}
+
 // 1. Panggil koneksi database
 include 'koneksi.php';
 
@@ -12,6 +19,9 @@ if (isset($_POST['simpan_transaksi'])) {
     $jenis_transaksi = $_POST['jenis_transaksi'];
     $jumlah = (int)$_POST['jumlah'];
     $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
+    
+    // [BARU] Menangkap ID Karyawan yang sedang melakukan transaksi dari Sesi Login
+    $id_user = $_SESSION['id']; 
 
     // Validasi Keamanan: Cegah stok minus jika barang keluar
     if ($jenis_transaksi == 'keluar') {
@@ -25,19 +35,18 @@ if (isset($_POST['simpan_transaksi'])) {
 
     // Jika tidak ada error (validasi aman), maka proses ke database
     if (empty($pesan_error)) {
-        // Langkah 1: Masukkan data riwayat ke tabel 'transaksi'
-        $query_insert = "INSERT INTO transaksi (id_barang, jenis_transaksi, jumlah, keterangan) 
-                         VALUES ('$id_barang', '$jenis_transaksi', '$jumlah', '$keterangan')";
+        // [BARU] Masukkan data riwayat ke tabel 'transaksi' dengan menyertakan id_user
+        $query_insert = "INSERT INTO transaksi (id_barang, id_user, jenis_transaksi, jumlah, keterangan) 
+                         VALUES ('$id_barang', '$id_user', '$jenis_transaksi', '$jumlah', '$keterangan')";
         mysqli_query($koneksi, $query_insert);
 
-        // Langkah 2: Update (Tambah/Kurang) stok di tabel 'barang'
+        // Update (Tambah/Kurang) stok di tabel 'barang'
         if ($jenis_transaksi == 'masuk') {
             mysqli_query($koneksi, "UPDATE barang SET stok = stok + $jumlah WHERE id_barang = '$id_barang'");
         } else if ($jenis_transaksi == 'keluar') {
             mysqli_query($koneksi, "UPDATE barang SET stok = stok - $jumlah WHERE id_barang = '$id_barang'");
         }
 
-        // Langkah 3: Arahkan pengguna ke halaman riwayat agar bisa langsung melihat hasilnya
         header("Location: riwayat.php");
         exit;
     }
@@ -50,35 +59,31 @@ if (isset($_POST['simpan_transaksi'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Catat Transaksi - ElectroStock</title>
+    <!-- Menambahkan Font Poppins agar selaras dengan halaman lainnya -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* CSS Dasar Konsisten */
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
+        body { font-family: 'Poppins', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
         
-        /* Tombol */
-        .btn { padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold; border: none; cursor: pointer; color: white; width: 100%; box-sizing: border-box; text-align: center; }
+        .btn { padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold; border: none; cursor: pointer; color: white; width: 100%; box-sizing: border-box; text-align: center; font-family: 'Poppins', sans-serif; }
         .btn-primary { background-color: #0984e3; }
         .btn-primary:hover { background-color: #076bb8; }
         .btn-secondary { background-color: #636e72; width: auto; }
         
-        /* Form */
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        .form-control { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; font-family: 'Poppins', sans-serif;}
         .form-control:focus { outline: none; border-color: #0984e3; }
         
-        /* Radio Button Kotak */
         .radio-group { display: flex; gap: 10px; }
         .radio-label { flex: 1; text-align: center; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; padding: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .radio-label:hover { background: #eee; }
         input[type="radio"] { display: none; }
         
-        /* Indikator Pilihan Transaksi */
         input[type="radio"]:checked + .radio-label.masuk { background-color: #00b894; color: white; border-color: #00b894; }
         input[type="radio"]:checked + .radio-label.keluar { background-color: #d63031; color: white; border-color: #d63031; }
 
-        /* Pesan Error */
         .alert-danger { background-color: #ffcccc; color: #cc0000; padding: 15px; border-radius: 4px; border-left: 5px solid #cc0000; margin-bottom: 20px; font-weight: bold; }
     </style>
 </head>
@@ -90,7 +95,11 @@ if (isset($_POST['simpan_transaksi'])) {
         <a href="index.php" class="btn btn-secondary" style="padding: 8px 12px; font-size: 14px;">⬅ Kembali</a>
     </div>
 
-    <!-- Tampilkan pesan error jika validasi stok gagal -->
+    <!-- Menampilkan Siapa yang Bertugas Saat Ini -->
+    <div style="background: #e1f5fe; padding: 10px 15px; border-radius: 5px; margin-bottom: 20px; font-size: 14px; color: #0277bd; font-weight: 500;">
+        👤 <strong>Karyawan Bertugas:</strong> <?php echo $_SESSION['nama']; ?> (NIK: <?php echo $_SESSION['id']; ?>)
+    </div>
+
     <?php if (!empty($pesan_error)) { ?>
         <div class="alert-danger">
             <?php echo $pesan_error; ?>
@@ -104,10 +113,8 @@ if (isset($_POST['simpan_transaksi'])) {
             <select name="id_barang" class="form-control" required>
                 <option value="">-- Pilih Barang Elektronik --</option>
                 <?php
-                // Ambil daftar barang dari database untuk dropdown
                 $q_barang = mysqli_query($koneksi, "SELECT id_barang, nama_barang, merek, stok FROM barang ORDER BY nama_barang ASC");
                 while($b = mysqli_fetch_assoc($q_barang)) {
-                    // Menampilkan nama, merek, dan sisa stok agar mempermudah pengguna
                     echo "<option value='".$b['id_barang']."'>".$b['nama_barang']." (".$b['merek'].") - Sisa Stok: ".$b['stok']."</option>";
                 }
                 ?>
